@@ -2399,6 +2399,21 @@ fn builtin_tree_diff_entry_methods<'repo>() -> CommitTemplateBuildMethodFnMap<'r
             Ok(out_property.into_dyn_wrapped())
         },
     );
+    map.insert(
+        "formatted_path",
+        |language, _diagnostics, _build_ctx, self_property, function| {
+            function.expect_no_arguments()?;
+            let path_converter = language.path_converter;
+            let out_property = self_property.map(move |entry| {
+                if entry.path.copy_operation().is_some() {
+                    path_converter.format_copied_path(entry.path.source(), entry.path.target())
+                } else {
+                    path_converter.format_file_path(entry.path.target())
+                }
+            });
+            Ok(out_property.into_dyn_wrapped())
+        },
+    );
     // TODO: add status_code() or status_char()?
     map.insert(
         "source",

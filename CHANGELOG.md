@@ -104,6 +104,9 @@ should not be broken.
 * `jj log` now supports a `--count` flag to print the number of commits instead
   of displaying them.
 
+* `TreeDiffEntry` type now has a `formatted_path()` method that formats
+  renames/copies appropriately.
+
 ### Fixed bugs
 
 * `jj fix` now prints a warning if a tool failed to run on a file.
