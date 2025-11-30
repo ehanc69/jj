@@ -104,8 +104,10 @@ should not be broken.
 * `jj log` now supports a `--count` flag to print the number of commits instead
   of displaying them.
 
-* `TreeDiffEntry` type now has a `formatted_path()` method that formats
-  renames/copies appropriately.
+* `TreeDiffEntry` type now has `formatted_path()` and `status_char()` methods.
+  `formatted_path()` shows renames/copies with common prefix extraction (e.g.,
+  `src/{old => new}/file.rs`). `status_char()` returns single-character status
+  codes (M/A/D/C/R).
 
 ### Fixed bugs
 

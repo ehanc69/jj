@@ -2414,7 +2414,18 @@ fn builtin_tree_diff_entry_methods<'repo>() -> CommitTemplateBuildMethodFnMap<'r
             Ok(out_property.into_dyn_wrapped())
         },
     );
-    // TODO: add status_code() or status_char()?
+    map.insert(
+        "status_char",
+        |_language, _diagnostics, _build_ctx, self_property, function| {
+            function.expect_no_arguments()?;
+            let out_property = self_property.map(|entry| {
+                let (_label, sigil) =
+                    diff_util::diff_status_label_and_char(&entry.path, &entry.values);
+                sigil.to_string()
+            });
+            Ok(out_property.into_dyn_wrapped())
+        },
+    );
     map.insert(
         "source",
         |_language, _diagnostics, _build_ctx, self_property, function| {
