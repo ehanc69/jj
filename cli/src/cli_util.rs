@@ -558,11 +558,7 @@ impl CommandHelper {
                 let repo = workspace_command.repo().clone();
                 let (mut locked_ws, desired_wc_commit) =
                     workspace_command.unchecked_start_working_copy_mutation()?;
-                match WorkingCopyFreshness::check_stale(
-                    locked_ws.locked_wc(),
-                    &desired_wc_commit,
-                    &repo,
-                )? {
+                match WorkingCopyFreshness::check_stale(locked_ws.locked_wc(), &repo)? {
                     WorkingCopyFreshness::Fresh | WorkingCopyFreshness::Updated(_) => {
                         writeln!(
                             ui.status(),
@@ -1907,7 +1903,7 @@ to the current parents may contain changes from multiple commits.
             .snapshot_options_with_start_tracking_matcher(&auto_tracking_matcher)
             .map_err(snapshot_command_error)?;
 
-        // Compare working-copy tree and operation with repo's, and reload as needed.
+        // Compare working-copy operation with repo's, and reload as needed.
         let mut locked_ws = self
             .workspace
             .start_working_copy_mutation()
@@ -1920,6 +1916,7 @@ to the current parents may contain changes from multiple commits.
             // committing the working copy.
             return Ok(SnapshotStats::default());
         };
+
         self.user_repo = ReadonlyUserRepo::new(repo);
         let (new_tree, stats) = {
             let mut options = options;
@@ -2612,12 +2609,15 @@ fn handle_stale_working_copy(
             .transpose()
             .map_err(snapshot_command_error)
     };
-    let Some(wc_commit) = get_wc_commit(&repo)? else {
-        return Ok(None);
-    };
     let old_op_id = locked_wc.old_operation_id().clone();
-    match WorkingCopyFreshness::check_stale(locked_wc, &wc_commit, &repo) {
-        Ok(WorkingCopyFreshness::Fresh) => Ok(Some((repo, wc_commit))),
+    match WorkingCopyFreshness::check_stale(locked_wc, &repo) {
+        Ok(WorkingCopyFreshness::Fresh) => {
+            if let Some(wc_commit) = get_wc_commit(&repo)? {
+                Ok(Some((repo, wc_commit)))
+            } else {
+                Ok(None)
+            }
+        }
         Ok(WorkingCopyFreshness::Updated(wc_operation)) => {
             let repo = repo
                 .reload_at(&wc_operation)
@@ -2628,17 +2628,27 @@ fn handle_stale_working_copy(
                 Ok(None)
             }
         }
-        Ok(WorkingCopyFreshness::WorkingCopyStale) => Err(
-            SnapshotWorkingCopyError::StaleWorkingCopy(user_error_with_hint(
-                format!(
-                    "The working copy is stale (not updated since operation {}).",
-                    short_operation_hash(&old_op_id)
-                ),
-                "Run `jj workspace update-stale` to update it.
+        Ok(WorkingCopyFreshness::WorkingCopyStale) => {
+            if let Some(wc_commit) = get_wc_commit(&repo)? {
+                if locked_wc.old_tree().tree_ids() == wc_commit.tree_ids() {
+                    Ok(Some((repo, wc_commit)))
+                } else {
+                    Err(SnapshotWorkingCopyError::StaleWorkingCopy(
+                        user_error_with_hint(
+                            format!(
+                                "The working copy is stale (not updated since operation {}).",
+                                short_operation_hash(&old_op_id)
+                            ),
+                            "Run `jj workspace update-stale` to update it.
 See https://docs.jj-vcs.dev/latest/working-copy/#stale-working-copy \
-                 for more information.",
-            )),
-        ),
+                             for more information.",
+                        ),
+                    ))
+                }
+            } else {
+                Ok(None)
+            }
+        }
         Ok(WorkingCopyFreshness::SiblingOperation) => Err(
             SnapshotWorkingCopyError::StaleWorkingCopy(internal_error(format!(
                 "The repo was loaded at operation {}, which seems to be a sibling of the working \

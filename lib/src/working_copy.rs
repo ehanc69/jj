@@ -362,12 +362,10 @@ impl WorkingCopyFreshness {
     #[instrument(skip_all)]
     pub fn check_stale(
         locked_wc: &dyn LockedWorkingCopy,
-        wc_commit: &Commit,
         repo: &ReadonlyRepo,
     ) -> Result<Self, OpStoreError> {
-        // Check if the working copy's tree matches the repo's view
-        let wc_tree = locked_wc.old_tree();
-        if wc_commit.tree_ids() == wc_tree.tree_ids() {
+        // Check if the working copy's operation matches the repo's operation
+        if locked_wc.old_operation_id() == repo.op_id() {
             // The working copy isn't stale, and no need to reload the repo.
             Ok(Self::Fresh)
         } else {
